@@ -25,6 +25,8 @@ typedef struct metadata {
 
 static metadata_t* freelist = NULL;
 
+int iter = 0;
+
 void* dmalloc(size_t numbytes) {
   /* initialize through mmap call first time */
   if(freelist == NULL) {      
@@ -53,6 +55,10 @@ void* dmalloc(size_t numbytes) {
   size_t beforesplitsize;
 
   void *userpointer;
+
+  if (freelist_temp == NULL) {
+    return NULL;
+  }
 
   while (freelist_temp != NULL) {
 
@@ -216,12 +222,14 @@ void* dmalloc(size_t numbytes) {
       return userpointer;
     }
 
-    else {
+    else { 
       freelist_temp = freelist_temp->next;
     }
 
   }
-  
+  //iterator
+//  iter = iter + 1;
+  //printf("successful runs = %d", iter);
   //return userpointer;
 }
 
@@ -232,7 +240,13 @@ void dfree(void* ptr) {
   // check adjacent blocks to the right and left, to see if they're also free
   // if so, we go into coalescing --> 1. add space of second block and its metadata/header to the first block. 2. unlink second block from freelist since it has now been absorbed by the first block
 
+//  printf("starting print free list\n");
+//  print_freelist();
+//  printf("ending print free list\n");
+
   metadata_t *traverse = freelist;
+  metadata_t *travcopy = freelist;
+  //metadata_t *permanenthead = freelist;
 
   metadata_t *left;
   metadata_t *right;
@@ -240,49 +254,68 @@ void dfree(void* ptr) {
   metadata_t *coal = freelist;
 
   metadata_t *l;
-  metadata_t *r;
+  metadata_t *r; 
+  metadata_t *tnext;
 
 // Find where in the freelist to re-insert the newly freed block.  Update previous and next pointers accordingly.
 
-  while (traverse != NULL) {
+  while (travcopy != NULL) {
     left = traverse->prev;
     right = traverse->next;
 
     if (left == NULL) {
       if (right != NULL) {
-        if ((void*)traverse < ptr && (void*)right > ptr) {
+        if ((void*)traverse > ptr && (void*)right < ptr) {
           //left = traverse;
           //right = traverse->next;
+          //if (traverse->next->next == NULL) {
+
+          //}
+
+          //printf("addy in between \n");
+
           traverse->next = (metadata_t*)ptr;
           ((metadata_t*)ptr)->prev = traverse;
 
           ((metadata_t*)ptr)->next = right;
           right->prev = ((metadata_t*)ptr);
 
+          //freelist = traverse;
+          traverse = freelist;
+
           break;
         }
-        else if ((void*)traverse > ptr) {
+        else if ((void*)traverse < ptr) {
+          //printf("addy BEFORE\n");
           ((metadata_t*)ptr)->next = traverse;
           traverse->prev = ((metadata_t*)ptr);
 
           ((metadata_t*)ptr)->prev = NULL;
 
+          freelist = ((metadata_t*)ptr);
+
+          traverse = freelist;
+
           break;
         }
         else {
+          travcopy = travcopy->next;
           traverse = traverse->next;
         }
 
       }
-      else {
+      else { 
         //left = traverse;
         //right = NULL
-        if ((void*)traverse < ptr) {
+        //printf("left null right null \n");
+        if ((void*)traverse > ptr) {
           traverse->next = ((metadata_t*)ptr);
           ((metadata_t*)ptr)->prev = traverse;
 
           ((metadata_t*)ptr)->next = NULL;
 
+          traverse = freelist;
+
           break;
         }
         else {
@@ -291,13 +324,21 @@ void dfree(void* ptr) {
 
           ((metadata_t*)ptr)->prev = NULL;
 
+          freelist = ((metadata_t*)ptr);
+
+          //traverse = freelist;
+          //((metadata_t*)ptr) = freelist;
+
           break;
         }
       }
     }
+
+
     else {
       if (right != NULL) {
-        if ((void*)traverse < ptr && (void*)right > ptr) {
+        //printf("left not right not \n");
+        if ((void*)traverse > ptr && (void*)right < ptr) {
           //left = traverse;
           //right = traverse->next
 
@@ -307,35 +348,67 @@ void dfree(void* ptr) {
           ((metadata_t*)ptr)->next = right;
           right->prev = ((metadata_t*)ptr);
 
+          traverse = freelist;
+
+          break;
+        }
+        else if ((void*)traverse < ptr) {
+          ((metadata_t*)ptr)->next = traverse;
+          traverse->prev = ((metadata_t*)ptr);
+
+          ((metadata_t*)ptr)->prev = left;
+          left->next = ((metadata_t*)ptr);
+
+          //freelist = ((metadata_t*)ptr);
+
+          traverse = freelist;
+
           break;
         }
         else {
+          travcopy = travcopy->next;
           traverse = traverse->next;
         }
       }
       else {
+        //printf("left not right null \n");
         //left = traverse;
         //right = NULL;
-        traverse->next = ((metadata_t*)ptr);
-        ((metadata_t*)ptr)->prev = traverse;
+        if ((void*)traverse > ptr) {
+          traverse->next = ((metadata_t*)ptr);
+          ((metadata_t*)ptr)->prev = traverse;
 
-        ((metadata_t*)ptr)->next = NULL;
+          ((metadata_t*)ptr)->next = NULL;
 
-        break;
+          traverse = freelist;
+
+          //freelist = coal;
+
+          break;
+        }
+        else {
+          travcopy = travcopy->next;
+          traverse = traverse->next;
+        }
       }
 
-    }
+    } 
+
+    //traverse = freelist;
 
   }
 
-// Coalescing
+  //traverse = freelist;
+  //coal = freelist;
 
+// Coalescing
+/*
   while (coal != NULL) {
     l = coal->prev;
     r = coal->next;
     if (l != NULL) {
       if (r != NULL) {
-        if (coal == (void*)l + sizeof(metadata_t) + l->size) {
+        if ((void*)coal == (void*)l + sizeof(metadata_t) + l->size) {
           l->next = r;
           r->prev = l;
           l->size = l->size + coal->size + sizeof(metadata_t);
@@ -347,9 +420,66 @@ void dfree(void* ptr) {
     }
 
     coal = coal->next;
+ 
+  }
+*/
 
+  /*
+  //coal = freelist
+  while (coal->next != NULL) {
+    if (coal->prev == NULL) { //first free element
+      coal=coal->next;
+    }
+    else { //we are at least at the second block
+      // COALESCE BACKWARDS
+      tnext = coal->next;
+      l = coal->prev;
+      if (coal == (((void*)l) + sizeof(metadata_t) + l->size)) {
+        l->size = l->size + coal->size + sizeof(metadata_t);
+        l->next = coal->next;
+        coal->next->prev = l;
+      }
+      // COALESCE FORWARDS
+      r = coal->next;
+      if (r == (((void*)l) + sizeof(metadata_t) + l->size)) {
+        l->size = l->size + r->size + sizeof(metadata_t);
+        l->next = r->next;
+        if (r->next != NULL) {
+          r->next->prev = l;
+        }
+        coal = r->next;
+      }
+      else  {
+        coal = tnext;
+      }
+    }
   }
 
+
+*/
+  int coalesced = 0;
+
+  while(coal != NULL){
+    if((((void *) coal + coal->size + METADATA_T_ALIGNED) == coal->next) && (coal->size != 0)){
+
+      coal->size = coal->size + coal->next->size + METADATA_T_ALIGNED;
+      coal->next = coal->next->next;
+      if (coal->next->size != 0) {
+        coal->next->prev = coal;
+      }
+      coalesced = 1;
+    }
+ 
+    if(coalesced == 1) {
+      coalesced = 0;
+      coal = freelist;
+    } else {
+      coal = coal->next;
+    }
+  }
+
+  //coal = freelist;
+  //freelist = coal;
 }
 
 bool dmalloc_init() {
@@ -375,9 +505,9 @@ bool dmalloc_init() {
   freelist->prev = NULL;
   freelist->size = max_bytes-METADATA_T_ALIGNED;
   return true;
-}
+} 
 
-/* for debugging; can be turned off through -NDEBUG flag*/
+/* for debugging; can be turned off through -NDEBUG flag*/ 
 void print_freelist() {
   metadata_t *freelist_head = freelist;
   while(freelist_head != NULL) {

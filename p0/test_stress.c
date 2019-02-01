@@ -137,6 +137,8 @@ int test_case4(double *nbytes, double *acc, int *nbytes_abs, int *acc_abs) {
 			nb = nb - datasize[itr];
 			datasize[itr] = 0;
 		}
+		//iterator
+		//printf("successful runs = %d", iter);
 	}
 
 	//free all memory

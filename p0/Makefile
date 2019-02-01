@@ -1,7 +1,8 @@
 # You can compile with either gcc or g++
 # CC = g++
 CC = gcc
-CFLAGS = -g -I. -Wall -lm -DNDEBUG
+CFLAGS = -g -I. -Wall -lm 
+# -DNDEBUG
 # disable the -DNDEBUG flag for the printing the freelist
 OPTFLAG = -O2
 

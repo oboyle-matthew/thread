@@ -101,13 +101,25 @@ int main(int argc, char *argv[])
 
     printf("calling dfree(ar1)\n");
     dfree(ar1);
-    printf("calling dfree(ar4)\n");
-    dfree(ar4);
-    printf("calling dfree(ar0)\n");
-    dfree(ar0);
     printf("calling dfree(ar2)\n");
     dfree(ar2);
+    printf("calling dfree(ar0)\n");
+    dfree(ar0);
+    printf("calling dfree(ar4)\n");
+    dfree(ar4);
+    printf("calling dfree(ar3)\n");
+    dfree(ar3);
 
+/*
+    printf("calling dfree(ar1)\n");
+    dfree(ar1);
+    printf("calling dfree(ar0)\n");
+    dfree(ar0);
+    printf("calling dfree(ar4)\n");
+    dfree(ar3);
+    printf("calling dfree(ar2)\n");
+    dfree(ar2);
+*/
     // dmalloc Ar5
     printf("ar 5: calling dmalloc(12)\n");
     ar5 = dmalloc(12);
