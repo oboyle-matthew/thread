@@ -25,7 +25,10 @@ typedef struct metadata {
 
 static metadata_t* freelist = NULL;
 
-int iter = 0;
+// initialize prologue and epilogue blocks - better for edge cases
+static metadata_t* prologue = NULL;
+static metadata_t* epilogue = NULL;
+static void searchforcoalesce();
 
 void* dmalloc(size_t numbytes) {
   /* initialize through mmap call first time */
@@ -35,451 +38,122 @@ void* dmalloc(size_t numbytes) {
   }
 
   assert(numbytes > 0);
+  numbytes = ALIGN(numbytes);
 
   /* your code here */
 
-  // loop through freelist (linked list) and check if size (size + header) is > numbytes ... access via ->size
-  // update linked list to point to the split free memory at the bottom ... block.prev.next ? where block is an instance of metadata
-    // if it fits exactly... update linked list to next free block ... list.next = list.next.next, skip over the block we just filled
-  // update size of blocks
-  // pointer should point to the start of the data block, skipped past the header
-  // if no more free room... error message?
+  metadata_t* temp = prologue;  //temp starts at the prologue block
 
-
-  metadata_t *freelist_temp = freelist; //initially points to head of freelist
-
-  metadata_t *tempprevious;
-  metadata_t *tempnext;
-
-
-  size_t beforesplitsize;
-
-  void *userpointer;
-
-  if (freelist_temp == NULL) {
-    return NULL;
+  while ((temp != NULL) && (temp->size < numbytes)) {
+    temp = temp->next;
   }
 
-  while (freelist_temp != NULL) {
-
-    if (((freelist_temp->size)+sizeof(metadata_t)) > (numbytes + sizeof(metadata_t))) {
-      tempprevious = freelist_temp->prev;
-      tempnext = freelist_temp->next;
-      if (tempprevious != NULL) {
-        tempprevious->next = tempnext;
-        if (tempnext != NULL) {
-          tempnext->prev = tempprevious;
-
-          beforesplitsize = freelist_temp->size + sizeof(metadata_t);
-          freelist_temp->size = numbytes;
-          userpointer = ((void*)freelist_temp) + sizeof(metadata_t);
-
-          freelist_temp = ((void*)freelist_temp) + sizeof(metadata_t) + numbytes;
-
-          tempprevious->next = freelist_temp;
-          freelist_temp->prev = tempprevious;
-
-          freelist_temp->next = tempnext;
-          tempnext->prev = freelist_temp;
-
-          freelist_temp->size = beforesplitsize - numbytes - sizeof(metadata_t) - sizeof(metadata_t);
-
-        }
-        else {
-          beforesplitsize = freelist_temp->size + sizeof(metadata_t);
-          freelist_temp->size = numbytes;
-          userpointer = ((void*)freelist_temp) + sizeof(metadata_t);
-
-          freelist_temp = ((void*)freelist_temp) + sizeof(metadata_t) + numbytes;
-
-          tempprevious->next = freelist_temp;
-          freelist_temp->prev = tempprevious;
-
-          freelist_temp->next = tempnext;
-
-          freelist_temp->size = beforesplitsize - numbytes - sizeof(metadata_t) - sizeof(metadata_t);
-
-        }
-      }
-      else {
-        if (tempnext != NULL) {
-          beforesplitsize = freelist_temp->size + sizeof(metadata_t);
-          freelist_temp->size = numbytes;
-          userpointer = ((void*)freelist_temp) + sizeof(metadata_t);
-
-          freelist_temp = ((void*)freelist_temp) + sizeof(metadata_t) + numbytes;
-
-          freelist_temp->next = tempnext;
-          tempnext->prev = freelist_temp;
-
-          freelist_temp->prev = tempprevious;
-
-          freelist_temp->size = beforesplitsize - numbytes - sizeof(metadata_t) - sizeof(metadata_t);
-
-          freelist = freelist_temp;
-        //  freelist->next = freelist_temp->next;
-        //  freelist->prev = freelist_temp->prev;
-        //  freelist->size = freelist_temp->size;
-        }
-        else {
-          beforesplitsize = freelist_temp->size + sizeof(metadata_t);
-          freelist_temp->size = numbytes;
-          userpointer = ((void*)freelist_temp) + sizeof(metadata_t);
-
-          freelist_temp = ((void*)freelist_temp) + sizeof(metadata_t) + numbytes;
-
-          freelist_temp->next = tempnext;
-          freelist_temp->prev = tempprevious;
-
-          freelist_temp->size = beforesplitsize - numbytes - sizeof(metadata_t) - sizeof(metadata_t);
-
-          freelist = freelist_temp;
-        //  freelist->next = freelist_temp->next;
-        //  freelist->prev = freelist_temp->prev;
-        //  freelist->size = freelist_temp->size;
-        }
-      }
-    return userpointer;
-    /*  
-      //split the block, update size of split blocks
-      beforesplitsize = freelist_temp->size + sizeof(metadata_t);
-      freelist_temp->size = numbytes;
-      userpointer = ((void*)freelist_temp) + sizeof(metadata_t);
-
-      freelist_temp = ((void*)freelist_temp) + sizeof(metadata_t) + numbytes;
-      // insert the split block BACK into the freelist
-
-      if (previous != NULL) {
-        previous->next = freelist_temp;
-      }
-      else if (previous==NULL && freelist_temp->next != NULL) {
-        freelist_temp->next->prev = NULL;
-        freelist = freelist_temp;
-      }
-
-      freelist_temp->size = beforesplitsize - numbytes - sizeof(metadata_t) - sizeof(metadata_t);
-
-      //freelist_temp = freelist_temp->next;
-*/
-    }
-
-    if (((freelist_temp->size)+sizeof(metadata_t)) == (numbytes + sizeof(metadata_t))) {
-      tempprevious = freelist_temp->prev;
-      tempnext = freelist_temp->next;
-      if (tempprevious != NULL) {
-        tempprevious->next = tempnext;
-        if (tempnext != NULL) {
-          tempnext->prev = tempprevious;
-
-          beforesplitsize = freelist_temp->size + sizeof(metadata_t);
-          freelist_temp->size = numbytes;
-          userpointer = ((void*)freelist_temp) + sizeof(metadata_t);
-        }
-        else {
-          beforesplitsize = freelist_temp->size + sizeof(metadata_t);
-          freelist_temp->size = numbytes;
-          userpointer = ((void*)freelist_temp) + sizeof(metadata_t);
-        }
-      }
-      else {
-        if (tempnext != NULL) {
-          beforesplitsize = freelist_temp->size + sizeof(metadata_t);
-          freelist_temp->size = numbytes;
-          userpointer = ((void*)freelist_temp) + sizeof(metadata_t);
-
-          freelist = tempnext;
-        //  freelist->next = freelist_temp->next;
-        //  freelist->prev = freelist_temp->prev;
-        //  freelist->size = freelist_temp->size;
-        }
-        else {
-          beforesplitsize = freelist_temp->size + sizeof(metadata_t);
-          freelist_temp->size = numbytes;
-          userpointer = ((void*)freelist_temp) + sizeof(metadata_t);
-
-          freelist_temp = NULL;
-        }
-      }
-/*
-      previous = freelist_temp->prev;
-      if (previous != NULL) {
-        previous->next = freelist_temp->next;
-        if (freelist_temp->next != NULL) {
-          freelist_temp->next->prev = previous;
-        }
-      }
-      userpointer = freelist_temp + sizeof(metadata_t);
-
-      // what if previous is null??
-      if (tempprevious==NULL && freelist_temp->next != NULL) {
-        freelist_temp->next->prev = NULL;
-        //freelist_temp = freelist_temp->next;
-      }
-
-      //previous = freelist_temp->prev;
-      //previous->next = freelist_temp->next;
-*/
-      return userpointer;
-    }
-
-    else { 
-      freelist_temp = freelist_temp->next;
-    }
-
+  if (temp == NULL) {
+    return NULL; 
   }
-  //iterator
-//  iter = iter + 1;
-  //printf("successful runs = %d", iter);
-  //return userpointer;
+
+  metadata_t* previous = temp->prev;
+  metadata_t* nextblock = temp->next;
+
+  if(temp->size > (numbytes + sizeof(metadata_t))) {
+
+    metadata_t* splitblock = (metadata_t*)((void*)temp + numbytes + sizeof(metadata_t));
+
+    splitblock->next = nextblock;
+    nextblock->prev = splitblock;
+    splitblock->prev = previous;
+    previous->next = splitblock;
+
+    splitblock->size = temp->size - numbytes - sizeof(metadata_t);
+    temp->size = numbytes;
+  }
+  else {    //the block is exactly the size of numbytes; fits perfectly, so update size and take block out of freelist
+
+    temp->size = numbytes;
+    nextblock->prev = previous;
+    previous->next = nextblock;
+  }
+
+//  void *userpointer;
+
+//  userpointer = (void*)temp + sizeof(metadata_t);
+
+//  return userpointer;
+  return ((void*) temp) + sizeof(metadata_t);
 }
 
+ 
 void dfree(void* ptr) {
   /* your code here */
 
-  // keep free list in SORTED ORDER by addresses
-  // check adjacent blocks to the right and left, to see if they're also free
-  // if so, we go into coalescing --> 1. add space of second block and its metadata/header to the first block. 2. unlink second block from freelist since it has now been absorbed by the first block
+  int finished = 0;
+  
+  metadata_t* temp = prologue;
+  metadata_t* free = (void*)ptr - sizeof(metadata_t);
 
-//  printf("starting print free list\n");
-//  print_freelist();
-//  printf("ending print free list\n");
+  if (free == NULL) {
+    return;
+  }
 
-  metadata_t *traverse = freelist;
-  metadata_t *travcopy = freelist;
-  //metadata_t *permanenthead = freelist;
+  while ((temp->next != NULL) || (finished == 0)) {
+    temp = temp->next;
+    if((temp->prev < free) && (temp > free)) {
+      free->prev = temp->prev;
+      free->next = temp;
+      temp->prev->next = free;
+      temp->prev = free;
 
-  metadata_t *left;
-  metadata_t *right;
+      finished = 1;
 
-  metadata_t *coal = freelist;
-
-  metadata_t *l;
-  metadata_t *r; 
-  metadata_t *tnext;
-
-// Find where in the freelist to re-insert the newly freed block.  Update previous and next pointers accordingly.
-
-  while (travcopy != NULL) {
-    left = traverse->prev;
-    right = traverse->next;
-
-    if (left == NULL) {
-      if (right != NULL) {
-        if ((void*)traverse > ptr && (void*)right < ptr) {
-          //left = traverse;
-          //right = traverse->next;
-          //if (traverse->next->next == NULL) {
-
-          //}
-
-          //printf("addy in between \n");
-
-          traverse->next = (metadata_t*)ptr;
-          ((metadata_t*)ptr)->prev = traverse;
-
-          ((metadata_t*)ptr)->next = right;
-          right->prev = ((metadata_t*)ptr);
-
-          //freelist = traverse;
-          traverse = freelist;
-
-          break;
-        }
-        else if ((void*)traverse < ptr) {
-          //printf("addy BEFORE\n");
-          ((metadata_t*)ptr)->next = traverse;
-          traverse->prev = ((metadata_t*)ptr);
-
-          ((metadata_t*)ptr)->prev = NULL;
-
-          freelist = ((metadata_t*)ptr);
-
-          traverse = freelist;
-
-          break;
-        }
-        else {
-          travcopy = travcopy->next;
-          traverse = traverse->next;
-        }
-
-      }
-      else { 
-        //left = traverse;
-        //right = NULL
-        //printf("left null right null \n");
-        if ((void*)traverse > ptr) {
-          traverse->next = ((metadata_t*)ptr);
-          ((metadata_t*)ptr)->prev = traverse;
-
-          ((metadata_t*)ptr)->next = NULL;
-
-          traverse = freelist;
-
-          break;
-        }
-        else {
-          ((metadata_t*)ptr)->next = traverse;
-          traverse->prev = ((metadata_t*)ptr);
-
-          ((metadata_t*)ptr)->prev = NULL;
-
-          freelist = ((metadata_t*)ptr);
-
-          //traverse = freelist;
-          //((metadata_t*)ptr) = freelist;
-
-          break;
-        }
-      }
+      print_freelist();
     }
+    else if((temp->prev->size == 0) && (temp > free)) {  //free is the first element after the prologue
+      free->next = temp;
+      free->prev = temp->prev;
+      temp->prev->next = free;
+      temp->prev = free;
 
+      finished = 1;
 
+      print_freelist();
+
+    }
+    else if ((temp < free) && (temp->next->size == 0)) { 
+      free->next = temp->next;
+      free->prev = temp;
+      temp->next->prev = free;
+      temp->next = free;
+
+      finished = 1;
+    }
+  }
+  searchforcoalesce();
+}
+
+void searchforcoalesce() {
+  printf("into coal\n");
+  metadata_t *temp = prologue; //reset temp to prologue to carry out coalescing
+  int finished = 0;
+
+  while (temp != NULL) {
+    if((temp->next == ((void*)temp + temp->size + sizeof(metadata_t))) && (temp->size != 0)) {
+      temp->next = temp->next->next;
+      temp->size = temp->size + temp->next->size + sizeof(metadata_t);
+    
+      if(temp->next->size != 0) { //not at end of list
+        temp->next->prev = temp;
+      }
+    finished = 1;
+    }
+    if(finished == 1) {
+      //start at beginning to look for more coalescing
+      finished = 0;
+      temp = prologue;
+    }
     else {
-      if (right != NULL) {
-        //printf("left not right not \n");
-        if ((void*)traverse > ptr && (void*)right < ptr) {
-          //left = traverse;
-          //right = traverse->next
-
-          traverse->next = ((metadata_t*)ptr);
-          ((metadata_t*)ptr)->prev = traverse;
-
-          ((metadata_t*)ptr)->next = right;
-          right->prev = ((metadata_t*)ptr);
-
-          traverse = freelist;
-
-          break;
-        }
-        else if ((void*)traverse < ptr) {
-          ((metadata_t*)ptr)->next = traverse;
-          traverse->prev = ((metadata_t*)ptr);
-
-          ((metadata_t*)ptr)->prev = left;
-          left->next = ((metadata_t*)ptr);
-
-          //freelist = ((metadata_t*)ptr);
-
-          traverse = freelist;
-
-          break;
-        }
-        else {
-          travcopy = travcopy->next;
-          traverse = traverse->next;
-        }
-      }
-      else {
-        //printf("left not right null \n");
-        //left = traverse;
-        //right = NULL;
-        if ((void*)traverse > ptr) {
-          traverse->next = ((metadata_t*)ptr);
-          ((metadata_t*)ptr)->prev = traverse;
-
-          ((metadata_t*)ptr)->next = NULL;
-
-          traverse = freelist;
-
-          //freelist = coal;
-
-          break;
-        }
-        else {
-          travcopy = travcopy->next;
-          traverse = traverse->next;
-        }
-      }
-
-    } 
-
-    //traverse = freelist;
-
-  }
-
-  //traverse = freelist;
-  //coal = freelist;
-
-// Coalescing
-/*
-  while (coal != NULL) {
-    l = coal->prev;
-    r = coal->next;
-    if (l != NULL) {
-      if (r != NULL) {
-        if ((void*)coal == (void*)l + sizeof(metadata_t) + l->size) {
-          l->next = r;
-          r->prev = l;
-          l->size = l->size + coal->size + sizeof(metadata_t);
-        }
-      }
-      else {
-        break;  // we are at the end of the freelist
-      }
-    }
-
-    coal = coal->next;
- 
-  }
-*/
-
-  /*
-  //coal = freelist
-  while (coal->next != NULL) {
-    if (coal->prev == NULL) { //first free element
-      coal=coal->next;
-    }
-    else { //we are at least at the second block
-      // COALESCE BACKWARDS
-      tnext = coal->next;
-      l = coal->prev;
-      if (coal == (((void*)l) + sizeof(metadata_t) + l->size)) {
-        l->size = l->size + coal->size + sizeof(metadata_t);
-        l->next = coal->next;
-        coal->next->prev = l;
-      }
-      // COALESCE FORWARDS
-      r = coal->next;
-      if (r == (((void*)l) + sizeof(metadata_t) + l->size)) {
-        l->size = l->size + r->size + sizeof(metadata_t);
-        l->next = r->next;
-        if (r->next != NULL) {
-          r->next->prev = l;
-        }
-        coal = r->next;
-      }
-      else  {
-        coal = tnext;
-      }
+      temp = temp->next;
     }
   }
-
-
-*/
-  int coalesced = 0;
-
-  while(coal != NULL){
-    if((((void *) coal + coal->size + METADATA_T_ALIGNED) == coal->next) && (coal->size != 0)){
-
-      coal->size = coal->size + coal->next->size + METADATA_T_ALIGNED;
-      coal->next = coal->next->next;
-      if (coal->next->size != 0) {
-        coal->next->prev = coal;
-      }
-      coalesced = 1;
-    }
- 
-    if(coalesced == 1) {
-      coalesced = 0;
-      coal = freelist;
-    } else {
-      coal = coal->next;
-    }
-  }
-
-  //coal = freelist;
-  //freelist = coal;
 }
 
 bool dmalloc_init() {
@@ -496,14 +170,24 @@ bool dmalloc_init() {
 
   size_t max_bytes = ALIGN(MAX_HEAP_SIZE);
   /* returns heap_region, which is initialized to freelist */
-  freelist = (metadata_t*) mmap(NULL, max_bytes, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  prologue = (metadata_t*) mmap(NULL, (max_bytes+sizeof(metadata_t)+sizeof(metadata_t)), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 
   /* Q: Why casting is used? i.e., why (void*)-1? */
-  if (freelist == (void *)-1)
+  if (prologue == (void *)-1)
     return false;
-  freelist->next = NULL;
-  freelist->prev = NULL;
-  freelist->size = max_bytes-METADATA_T_ALIGNED;
+
+  freelist = prologue+1;
+  freelist->size = max_bytes - sizeof(metadata_t);
+
+  prologue->prev = NULL;
+  prologue->next = freelist;
+
+  epilogue = (void*)freelist + sizeof(metadata_t) + max_bytes;
+  epilogue->prev = freelist;
+
+  freelist->next = epilogue;
+  freelist->prev = prologue;
+
   return true;
 } 
 
