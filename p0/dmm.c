@@ -12,7 +12,7 @@ typedef struct metadata {
    * object depends on the architecture and its implementation, size_t is used
    * to represent the maximum size of any object in the particular
    * implementation. size contains the size of the data object or the number of
-   * free bytes
+   * free bytes 
    */
   size_t size;
   struct metadata* next;
@@ -28,7 +28,6 @@ static metadata_t* freelist = NULL;
 // initialize prologue and epilogue blocks - better for edge cases
 static metadata_t* prologue = NULL;
 static metadata_t* epilogue = NULL;
-static void searchforcoalesce();
 
 void* dmalloc(size_t numbytes) {
   /* initialize through mmap call first time */
@@ -38,15 +37,22 @@ void* dmalloc(size_t numbytes) {
   }
 
   assert(numbytes > 0);
+  
   numbytes = ALIGN(numbytes);
 
   /* your code here */
 
+  void *userpointer; //to be returned
+
   metadata_t* temp = prologue;  //temp starts at the prologue block
+
+  //first, search for a block that's large enough to hold numbytes
 
   while ((temp != NULL) && (temp->size < numbytes)) {
     temp = temp->next;
   }
+
+  //now, we've either found a block large enough, or temp is null
 
   if (temp == NULL) {
     return NULL; 
@@ -55,9 +61,11 @@ void* dmalloc(size_t numbytes) {
   metadata_t* previous = temp->prev;
   metadata_t* nextblock = temp->next;
 
+  //free space that we've found is larger than what we're looking for, so we'll need to split the block
+
   if(temp->size > (numbytes + sizeof(metadata_t))) {
 
-    metadata_t* splitblock = (metadata_t*)((void*)temp + numbytes + sizeof(metadata_t));
+    metadata_t* splitblock = (metadata_t*)(((void*)temp) + numbytes + sizeof(metadata_t));
 
     splitblock->next = nextblock;
     nextblock->prev = splitblock;
@@ -74,84 +82,83 @@ void* dmalloc(size_t numbytes) {
     previous->next = nextblock;
   }
 
-//  void *userpointer;
+  userpointer = (void*)temp + sizeof(metadata_t);
 
-//  userpointer = (void*)temp + sizeof(metadata_t);
-
-//  return userpointer;
-  return ((void*) temp) + sizeof(metadata_t);
+  return userpointer;
 }
 
  
 void dfree(void* ptr) {
   /* your code here */
 
-  int finished = 0;
+  bool finished = false;
   
   metadata_t* temp = prologue;
-  metadata_t* free = (void*)ptr - sizeof(metadata_t);
+  metadata_t* free = (metadata_t*)((void*)ptr - sizeof(metadata_t));  //points to the block that we are trying to free
 
   if (free == NULL) {
     return;
   }
 
-  while ((temp->next != NULL) || (finished == 0)) {
+  while ((temp->next != NULL) || (finished == false)) {
+
     temp = temp->next;
-    if((temp->prev < free) && (temp > free)) {
+
+    if((temp->prev < free) && (temp > free)) {   // here is where to insert the 'free' block into the freelist
+
       free->prev = temp->prev;
       free->next = temp;
       temp->prev->next = free;
       temp->prev = free;
 
-      finished = 1;
-
-      print_freelist();
+      finished = true;
     }
-    else if((temp->prev->size == 0) && (temp > free)) {  //free is the first element after the prologue
+
+    else if((temp->prev->prev == NULL) && (temp > free)) {  //temp is the first element after the prologue
       free->next = temp;
       free->prev = temp->prev;
       temp->prev->next = free;
       temp->prev = free;
 
-      finished = 1;
-
-      print_freelist();
-
+      finished = true;
     }
-    else if ((temp < free) && (temp->next->size == 0)) { 
+
+    else if ((temp < free) && (temp->next->next == NULL)) { //temp is the last element before the epilogue
       free->next = temp->next;
       free->prev = temp;
       temp->next->prev = free;
       temp->next = free;
 
-      finished = 1;
-    }
+      finished = true; 
+    } 
   }
-  searchforcoalesce();
-}
 
-void searchforcoalesce() {
-  printf("into coal\n");
-  metadata_t *temp = prologue; //reset temp to prologue to carry out coalescing
-  int finished = 0;
+  //CHECK FOR COALESCING
+ 
+  temp = prologue; //reset temp to prologue to carry out coalescing
+
+  finished = false; //reset boolean to track once something has been coalesced
 
   while (temp != NULL) {
     if((temp->next == ((void*)temp + temp->size + sizeof(metadata_t))) && (temp->size != 0)) {
-      temp->next = temp->next->next;
-      temp->size = temp->size + temp->next->size + sizeof(metadata_t);
+
+      temp->size = temp->size + temp->next->size + sizeof(metadata_t);    //size of our new larger, coalesced block
+      temp->next = temp->next->next;    //skip over the block that has now been coalesced with temp
     
       if(temp->next->size != 0) { //not at end of list
         temp->next->prev = temp;
       }
-    finished = 1;
+      finished = true;
     }
-    if(finished == 1) {
+
+    if(finished == true) {
       //start at beginning to look for more coalescing
-      finished = 0;
+      finished = false;
       temp = prologue;
     }
+
     else {
-      temp = temp->next;
+      temp = temp->next;  //nothing to be coalesced here. check next block
     }
   }
 }
@@ -176,7 +183,7 @@ bool dmalloc_init() {
   if (prologue == (void *)-1)
     return false;
 
-  freelist = prologue+1;
+  freelist = prologue+1;  //freelist will point to the address after prologue
   freelist->size = max_bytes - sizeof(metadata_t);
 
   prologue->prev = NULL;
