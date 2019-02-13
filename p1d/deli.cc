@@ -1,48 +1,92 @@
 #include <iostream>
 #include <fstream>
-#include<iostream>
-#include<thread>
+#include <thread.h>
+
+
+
 #include <vector>
 #include <pthread.h>
+#include <list>
+#include <stdlib.h>
+#include <stdio.h>
+#include <time.h>
+#include <unistd.h>
+
 using namespace std;
 
-#define NUM_THREADS 5
+char** argv_copy;
+int argc_copy;
+int BOARDSIZE = 2;
+int LOCK_NUM = 12345;
 
-char** all_args;
 
-void *Cashier(void *cashierid) {
+void start(void);
+void cashier_method(void*);
+void initializeBoard();
+
+struct sandwich_order {
+	int cashier;
+	int sandwich_num;
+	sandwich_order* next;
+};
+
+struct board {
+	unsigned int lock;
+	unsigned int curr_size;
+	unsigned int max_size; 
+	sandwich_order* head;
+};
+
+struct test {
+	int first;
+	int second; 
+	int third;
+};
+
+struct cashier {
+	int num;
+};
+
+board* myBoard;
+
+int main(int argc, char** argv) {
+	argv_copy = argv;
+	argc_copy = argc;	
+	thread_libinit((thread_startfunc_t) start, NULL);
+}
+
+void start(void) {
+	initializeBoard();
+	start_preemptions(true, true, 1);	
+	cout << "Start\n";
+	for (int i = 1; i < argc_copy; i++) {
+		cashier* new_cashier = (cashier*) malloc(sizeof(cashier));
+		new_cashier->num = i;
+		thread_create((thread_startfunc_t) cashier_method, new_cashier);
+	}
+}
+
+void initializeBoard() {
+    myBoard = (board*) malloc(sizeof(board));
+	myBoard->max_size = BOARDSIZE;
+	myBoard->curr_size = 0;
+	myBoard->lock = LOCK_NUM;
+}
+
+void cashier_method(void* cashier_input) {
 	string line;
-	long cid;
-	cid = (long) cashierid;
-	printf("Cashier %li is starting\n\n", cid);
-	ifstream myfile (all_args[cid]);
+	cashier* cashier_copy = (cashier*) cashier_input;
+	int cid = cashier_copy->num;
+	ifstream myfile (argv_copy[cid]);
   	if (myfile.is_open()) {
   		int line_count = 0;
     	while (getline(myfile,line)) {
-    		printf("Cashier = %li \tLine = %i \tText = %s\n", cid, line_count, line.c_str());
+    		thread_lock(0);
+    		cout << "Cashier = " << cid << "\tLine = " << line_count << "\tText = " << line << "\n";
       		line_count++;
    		}
    		myfile.close();
   	} else {
-  		printf("Unable to open file for cashier %li\n", cid);
+  		printf("Unable to open file for cashier %i\n", cid);
 	}
-	printf("Cashier %li is finished\n\n", cid);
-}
-
-
-int main(int argc, char** argv) {	
-	all_args = argv;
-    pthread_t threads[NUM_THREADS];
-   	int rc;
-   	int i;   
-   	string line;
-   	for( i = 1; i < argc; i++ ) {
-      	rc = pthread_create(&threads[i], NULL, Cashier, (void *)i);
-      
-      	if (rc) {
-         	cout << "Error:unable to create thread," << rc << endl;
-         	exit(-1);
-      	}	
-   	}
-   	pthread_exit(NULL);
 }
