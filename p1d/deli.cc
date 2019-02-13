@@ -3,9 +3,7 @@
 #include <thread.h>
 
 
-
 #include <vector>
-#include <pthread.h>
 #include <list>
 #include <stdlib.h>
 #include <stdio.h>
@@ -22,6 +20,9 @@ unsigned int BOARD_LOCK = 12345;
 unsigned int COUT_LOCK = 99999;
 unsigned int FULL_CONDITION = 987654321;
 
+int last_num = -1;
+
+
 
 void start(void);
 void maker_method(void);
@@ -31,7 +32,6 @@ void initializeBoard();
 struct sandwich_order {
 	unsigned int cashier;
 	int sandwich_num;
-	//Only singly linked list now. Might be doubly linked in the future
 	sandwich_order* next;
 	sandwich_order* prev;
 };
@@ -76,44 +76,40 @@ void start(void) {
 }
 
 void maker_method(void) {
-	// int last_num = -1;
 	while (myBoard->curr_size > 0 || numLiveCashiers > 0) {
 		if (myBoard->curr_size == 0) {
 			thread_yield();
 		}
 		if (myBoard->curr_size >= myBoard->max_size || myBoard->curr_size >= numLiveCashiers) {
-			//Pick a sandwich
 			sandwich_order* sandwich_picked = (sandwich_order*) malloc(sizeof(sandwich_order));
-			// sandwich_order* curr = (sandwich_order*) malloc(sizeof(sandwich_order));
-			// int closest_num = 9999;
+			sandwich_order* curr = (sandwich_order*) malloc(sizeof(sandwich_order));
+			int closest_num = 9999;
 			sandwich_picked = myBoard->head;
-			// curr = myBoard->head;
-			// while (curr != NULL) {
-			// 	if (abs(curr->sandwich_num - last_num) < closest_num) {
-			// 		sandwich_picked = curr;
-			// 		closest_num = curr->sandwich_num - last_num;
-			// 	}
-			// 	curr = curr->next;
-			// }
-			// if (sandwich_picked->next != NULL) {
-
-			// 	sandwich_picked->next->prev = sandwich_picked->prev;
-			// }
-			// if (sandwich_picked->prev != NULL) {
-			// 	sandwich_picked->prev->next = sandwich_picked->next;
-			// }
-			//Just taking first sandwich atm!
+			curr = myBoard->head;
+			while (curr != NULL) {
+				if (abs(curr->sandwich_num - last_num) < closest_num) {
+					sandwich_picked = curr;
+					closest_num = abs(curr->sandwich_num - last_num);
+				}
+				curr = curr->next;
+			}
+			if (sandwich_picked->next != NULL) {
+				sandwich_picked->next->prev = sandwich_picked->prev;
+			}
+			if (sandwich_picked->prev != NULL) {
+				sandwich_picked->prev->next = sandwich_picked->next;
+			} else {
+				myBoard->head = sandwich_picked->next;
+			}
+			last_num = sandwich_picked->sandwich_num;
 			thread_lock(COUT_LOCK);
 			cout << "READY: cashier " << sandwich_picked->cashier-2 << " sandwich " << sandwich_picked->sandwich_num << endl;
 			thread_unlock(COUT_LOCK);
 			thread_lock(myBoard->lock);
-			myBoard->head = sandwich_picked->next;
 			myBoard->curr_size = myBoard->curr_size - 1;
 			thread_unlock(myBoard->lock);
 			thread_broadcast(myBoard->lock, myBoard->full_condition);
 			thread_signal(myBoard->lock, sandwich_picked->cashier);
-			//TODO: Currently only taking first sandwich from the list. Need to take smallest/msot similar
-			//Maybe doubly linked list???
 		}
 		thread_yield();
 	}
@@ -136,14 +132,13 @@ void cashier_method(void* cashier_input) {
   		getline(myfile,sandwich);
   		thread_lock(myBoard->lock);
     	while (myfile) {
-    		// cout << "\nControl given back to cashier " << cid << endl;
     		if (myBoard->curr_size < myBoard->max_size) {
     			thread_lock(COUT_LOCK);
     			cout << "POSTED: cashier " << cid-2 << " sandwich " << sandwich << endl;
       			thread_unlock(COUT_LOCK);
 
       			sandwich_order* new_sandwich = (sandwich_order*) malloc(sizeof(sandwich_order));
-      			new_sandwich->sandwich_num = stoi(sandwich);
+      			new_sandwich->sandwich_num = std::stoi(sandwich);
       			//stoi converts string to integer. Sandwich is read from file as type string!
       			new_sandwich->cashier = cid;
       			new_sandwich->next = myBoard->head;
@@ -160,7 +155,6 @@ void cashier_method(void* cashier_input) {
     		}
    		}
    		thread_unlock(myBoard->lock);
-   		// cout << "Cashier " << cid << " is finished\n";
    		numLiveCashiers--;
    		myfile.close();
   	} else {
