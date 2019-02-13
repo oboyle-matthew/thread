@@ -1,0 +1,32 @@
+CASHIER ALGORITHM:
+
+acquire lock for list
+
+while I have more orders //
+	if room on board //
+		lock cout // should we be printing while we have board lock
+		print
+		unlock cout
+		add to board
+		wait until my sandwich is made // wait(boardLock, uniqueID) this waits on signal
+	else
+		wait until room on board  // this waits on broadcast
+numLivesCashiers- -; //this happens when you’re woken up after last sandwich is made
+
+
+MAKER ALGORITHM:
+
+while numThingsOnBoard>0 OR numLiveCashiers>0
+	if board is full OR num things on board >= numLivesCashiers
+		pick a sandwich
+		lock cout
+		print what sandwich you’re making
+		unlock cout
+		acquire board lock
+		remove sandwich
+		release lock
+		broadcast that board is not full
+		signal to that cashier that their sandwich is made
+		
+	yield //maybe this need to be a signal
+	
