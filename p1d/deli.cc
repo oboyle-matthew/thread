@@ -2,7 +2,7 @@
 #include <fstream>
 #include <thread.h>
 
-
+#include <string>
 #include <vector>
 #include <list>
 #include <stdlib.h>
