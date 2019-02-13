@@ -17,7 +17,7 @@ using namespace std;
 char** argv_copy;
 int argc_copy;
 unsigned int numLiveCashiers;
-unsigned int BOARDSIZE = 2;
+unsigned int boardSize;
 unsigned int BOARD_LOCK = 12345;
 unsigned int COUT_LOCK = 99999;
 unsigned int FULL_CONDITION = 987654321;
@@ -33,6 +33,7 @@ struct sandwich_order {
 	int sandwich_num;
 	//Only singly linked list now. Might be doubly linked in the future
 	sandwich_order* next;
+	sandwich_order* prev;
 };
 
 struct board {
@@ -57,16 +58,16 @@ board* myBoard;
 
 int main(int argc, char** argv) {
 	argv_copy = argv;
-	argc_copy = argc;	
+	argc_copy = argc;
+	boardSize = atoi(argv[1]);	
 	thread_libinit((thread_startfunc_t) start, NULL);
 }
 
 void start(void) {
 	initializeBoard();
 	start_preemptions(false, false, 1);	
-	cout << "Start\n";
-	numLiveCashiers = argc_copy-1;
-	for (int i = 1; i < argc_copy; i++) {
+	numLiveCashiers = argc_copy-2;
+	for (int i = 2; i < argc_copy; i++) {
 		cashier* new_cashier = (cashier*) malloc(sizeof(cashier));
 		new_cashier->num = i;
 		thread_create((thread_startfunc_t) cashier_method, new_cashier);
@@ -75,20 +76,35 @@ void start(void) {
 }
 
 void maker_method(void) {
+	// int last_num = -1;
 	while (myBoard->curr_size > 0 || numLiveCashiers > 0) {
 		if (myBoard->curr_size == 0) {
 			thread_yield();
 		}
-		// cout << "size = " << myBoard->curr_size << endl;
-		// cout << "numLiveCashiers = " << numLiveCashiers << endl;
-
 		if (myBoard->curr_size >= myBoard->max_size || myBoard->curr_size >= numLiveCashiers) {
 			//Pick a sandwich
 			sandwich_order* sandwich_picked = (sandwich_order*) malloc(sizeof(sandwich_order));
+			// sandwich_order* curr = (sandwich_order*) malloc(sizeof(sandwich_order));
+			// int closest_num = 9999;
 			sandwich_picked = myBoard->head;
+			// curr = myBoard->head;
+			// while (curr != NULL) {
+			// 	if (abs(curr->sandwich_num - last_num) < closest_num) {
+			// 		sandwich_picked = curr;
+			// 		closest_num = curr->sandwich_num - last_num;
+			// 	}
+			// 	curr = curr->next;
+			// }
+			// if (sandwich_picked->next != NULL) {
+
+			// 	sandwich_picked->next->prev = sandwich_picked->prev;
+			// }
+			// if (sandwich_picked->prev != NULL) {
+			// 	sandwich_picked->prev->next = sandwich_picked->next;
+			// }
 			//Just taking first sandwich atm!
 			thread_lock(COUT_LOCK);
-			cout << "READY: cashier " << sandwich_picked->cashier << " sandwich " << sandwich_picked->sandwich_num << endl;
+			cout << "READY: cashier " << sandwich_picked->cashier-2 << " sandwich " << sandwich_picked->sandwich_num << endl;
 			thread_unlock(COUT_LOCK);
 			thread_lock(myBoard->lock);
 			myBoard->head = sandwich_picked->next;
@@ -105,7 +121,7 @@ void maker_method(void) {
 
 void initializeBoard() { 
     myBoard = (board*) malloc(sizeof(board));
-	myBoard->max_size = BOARDSIZE;
+	myBoard->max_size = boardSize;
 	myBoard->curr_size = 0;
 	myBoard->lock = BOARD_LOCK;
 	myBoard->full_condition = FULL_CONDITION;
@@ -123,7 +139,7 @@ void cashier_method(void* cashier_input) {
     		// cout << "\nControl given back to cashier " << cid << endl;
     		if (myBoard->curr_size < myBoard->max_size) {
     			thread_lock(COUT_LOCK);
-    			cout << "POSTED: cashier " << cid << " sandwich " << sandwich << endl;
+    			cout << "POSTED: cashier " << cid-2 << " sandwich " << sandwich << endl;
       			thread_unlock(COUT_LOCK);
 
       			sandwich_order* new_sandwich = (sandwich_order*) malloc(sizeof(sandwich_order));
@@ -131,6 +147,9 @@ void cashier_method(void* cashier_input) {
       			//stoi converts string to integer. Sandwich is read from file as type string!
       			new_sandwich->cashier = cid;
       			new_sandwich->next = myBoard->head;
+      			if (myBoard->head != NULL) {
+      				myBoard->head->prev = new_sandwich;
+      			}
       			myBoard->head = new_sandwich;
       			myBoard->curr_size = myBoard->curr_size + 1;
 
