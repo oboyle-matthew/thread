@@ -65,7 +65,7 @@ int main(int argc, char** argv) {
 
 void start(void) {
 	initializeBoard();
-	start_preemptions(true, true, 1234);	
+	start_preemptions(true, true, 1);	
 	numLiveCashiers = argc_copy-2;
 	for (int i = 2; i < argc_copy; i++) {
 		cashier* new_cashier = (cashier*) malloc(sizeof(cashier));
