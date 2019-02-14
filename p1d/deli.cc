@@ -124,12 +124,14 @@ void initializeBoard() {
 }
 
 void cashier_method(void* cashier_input) {
-	string sandwich;
+	int sandwich;
 	cashier* cashier_copy = (cashier*) cashier_input;
 	unsigned int cid = cashier_copy->num;
-	ifstream myfile (argv_copy[cid]);
+	// ifstream myfile (argv_copy[cid]);
+	fstream myfile(argv_copy[cid]);
   	if (myfile.is_open()) {
-  		getline(myfile,sandwich);
+  		// getline(myfile,sandwich);
+  		myfile >> sandwich;
   		thread_lock(myBoard->lock);
     	while (myfile) {
     		if (myBoard->curr_size < myBoard->max_size) {
@@ -138,8 +140,7 @@ void cashier_method(void* cashier_input) {
       			thread_unlock(COUT_LOCK);
 
       			sandwich_order* new_sandwich = (sandwich_order*) malloc(sizeof(sandwich_order));
-      			new_sandwich->sandwich_num = std::stoi(sandwich);
-      			//stoi converts string to integer. Sandwich is read from file as type string!
+      			new_sandwich->sandwich_num = sandwich;
       			new_sandwich->cashier = cid;
       			new_sandwich->next = myBoard->head;
       			if (myBoard->head != NULL) {
@@ -149,7 +150,8 @@ void cashier_method(void* cashier_input) {
       			myBoard->curr_size = myBoard->curr_size + 1;
 
       			thread_wait(myBoard->lock, cid);
-      			getline(myfile,sandwich);
+      			// getline(myfile,sandwich);
+      			myfile >> sandwich;
     		} else {
     			thread_wait(myBoard->lock, myBoard->full_condition);
     		}
