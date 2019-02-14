@@ -65,7 +65,7 @@ int main(int argc, char** argv) {
 
 void start(void) {
 	initializeBoard();
-	start_preemptions(false, false, 1);	
+	start_preemptions(true, true, 1234);	
 	numLiveCashiers = argc_copy-2;
 	for (int i = 2; i < argc_copy; i++) {
 		cashier* new_cashier = (cashier*) malloc(sizeof(cashier));
@@ -76,11 +76,14 @@ void start(void) {
 }
 
 void maker_method(void) {
-	while (myBoard->curr_size > 0 || numLiveCashiers > 0) {
+	while (/*myBoard->curr_size > 0 || */numLiveCashiers > 0) {
+	/*
 		if (myBoard->curr_size == 0) {
-			thread_yield();
+			//thread_yield(); //The purpose of this was to let other threads add to the board if there's 
 		}
-		if (myBoard->curr_size >= myBoard->max_size || myBoard->curr_size >= numLiveCashiers) {
+		else{ // this else needed so that when control returns from the above yield, we recheck that the board is nonempty
+			*/
+		if (myBoard->curr_size > 0 && (myBoard->curr_size == myBoard->max_size || myBoard->curr_size == numLiveCashiers)) {
 			sandwich_order* sandwich_picked = (sandwich_order*) malloc(sizeof(sandwich_order));
 			sandwich_order* curr = (sandwich_order*) malloc(sizeof(sandwich_order));
 			int closest_num = 9999;
@@ -111,6 +114,7 @@ void maker_method(void) {
 			thread_broadcast(myBoard->lock, myBoard->full_condition);
 			thread_signal(myBoard->lock, sandwich_picked->cashier);
 		}
+		//}
 		thread_yield();
 	}
 }
@@ -138,11 +142,11 @@ void cashier_method(void* cashier_input) {
     			thread_lock(COUT_LOCK);
     			cout << "POSTED: cashier " << cid-2 << " sandwich " << sandwich << endl;
       			thread_unlock(COUT_LOCK);
-
       			sandwich_order* new_sandwich = (sandwich_order*) malloc(sizeof(sandwich_order));
       			new_sandwich->sandwich_num = sandwich;
       			new_sandwich->cashier = cid;
       			new_sandwich->next = myBoard->head;
+      			new_sandwich->prev = NULL; // this got rid of seg fault but now program stops halfway through
       			if (myBoard->head != NULL) {
       				myBoard->head->prev = new_sandwich;
       			}
