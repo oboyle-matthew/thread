@@ -19,6 +19,7 @@ unsigned int boardSize;
 unsigned int BOARD_LOCK = 12345;
 unsigned int COUT_LOCK = 99999;
 unsigned int FULL_CONDITION = 987654321;
+unsigned int READY_CONDITION = 5318008;
 
 int last_num = -1;
 
@@ -65,7 +66,7 @@ int main(int argc, char** argv) {
 
 void start(void) {
 	initializeBoard();
-	start_preemptions(true, true, 1);	
+	start_preemptions(true, true, 54327);	
 	numLiveCashiers = argc_copy-2;
 	for (int i = 2; i < argc_copy; i++) {
 		cashier* new_cashier = (cashier*) malloc(sizeof(cashier));
@@ -76,6 +77,7 @@ void start(void) {
 }
 
 void maker_method(void) {
+	thread_lock(myBoard->lock);
 	while (/*myBoard->curr_size > 0 || */numLiveCashiers > 0) {
 	/*
 		if (myBoard->curr_size == 0) {
@@ -108,15 +110,17 @@ void maker_method(void) {
 			thread_lock(COUT_LOCK);
 			cout << "READY: cashier " << sandwich_picked->cashier-2 << " sandwich " << sandwich_picked->sandwich_num << endl;
 			thread_unlock(COUT_LOCK);
-			thread_lock(myBoard->lock);
+			//thread_lock(myBoard->lock);
 			myBoard->curr_size = myBoard->curr_size - 1;
-			thread_unlock(myBoard->lock);
+			//thread_unlock(myBoard->lock);
 			thread_broadcast(myBoard->lock, myBoard->full_condition);
 			thread_signal(myBoard->lock, sandwich_picked->cashier);
 		}
-		//}
-		thread_yield();
+		//thread_yield();
+		thread_wait(myBoard->lock, READY_CONDITION);
+
 	}
+	thread_unlock(myBoard->lock);
 }
 
 void initializeBoard() { 
@@ -152,7 +156,12 @@ void cashier_method(void* cashier_input) {
       			}
       			myBoard->head = new_sandwich;
       			myBoard->curr_size = myBoard->curr_size + 1;
-
+      			bool boardReady = 
+      				myBoard->curr_size == myBoard->max_size 
+      				|| myBoard->curr_size == numLiveCashiers;
+      			if(boardReady){
+      				thread_signal(myBoard->lock, READY_CONDITION);
+      			}
       			thread_wait(myBoard->lock, cid);
       			// getline(myfile,sandwich);
       			myfile >> sandwich;
@@ -160,8 +169,11 @@ void cashier_method(void* cashier_input) {
     			thread_wait(myBoard->lock, myBoard->full_condition);
     		}
    		}
-   		thread_unlock(myBoard->lock);
    		numLiveCashiers--;
+   		if(myBoard->curr_size == numLiveCashiers){
+   			thread_signal(myBoard->lock, READY_CONDITION);
+   		}
+   		thread_unlock(myBoard->lock);
    		myfile.close();
   	} else {
   		printf("Unable to open file for cashier %i\n", cid);
