@@ -1,14 +1,17 @@
 #include <iostream>
 #include <fstream>
-#include <thread.h>
+#include "thread.h"
 
+#include <stdlib.h>
+
+/*
 #include <string>
 #include <vector>
 #include <list>
-#include <stdlib.h>
 #include <stdio.h>
 #include <time.h>
 #include <unistd.h>
+*/
 
 using namespace std;
 
@@ -108,7 +111,7 @@ void maker_method(void) {
 			}
 			last_num = sandwich_picked->sandwich_num;
 			thread_lock(COUT_LOCK);
-			cout << "READY: cashier " << sandwich_picked->cashier-2 << " sandwich " << sandwich_picked->sandwich_num << endl;
+			std::cout << "READY: cashier " << sandwich_picked->cashier-2 << " sandwich " << sandwich_picked->sandwich_num << endl;
 			thread_unlock(COUT_LOCK);
 			//thread_lock(myBoard->lock);
 			myBoard->curr_size = myBoard->curr_size - 1;
@@ -136,7 +139,8 @@ void cashier_method(void* cashier_input) {
 	cashier* cashier_copy = (cashier*) cashier_input;
 	unsigned int cid = cashier_copy->num;
 	// ifstream myfile (argv_copy[cid]);
-	fstream myfile(argv_copy[cid]);
+	std::fstream myfile;
+	myfile.open(argv_copy[cid]);
   	if (myfile.is_open()) {
   		// getline(myfile,sandwich);
   		myfile >> sandwich;
@@ -144,7 +148,7 @@ void cashier_method(void* cashier_input) {
     	while (myfile) {
     		if (myBoard->curr_size < myBoard->max_size) {
     			thread_lock(COUT_LOCK);
-    			cout << "POSTED: cashier " << cid-2 << " sandwich " << sandwich << endl;
+    			std::cout << "POSTED: cashier " << cid-2 << " sandwich " << sandwich << endl;
       			thread_unlock(COUT_LOCK);
       			sandwich_order* new_sandwich = (sandwich_order*) malloc(sizeof(sandwich_order));
       			new_sandwich->sandwich_num = sandwich;
