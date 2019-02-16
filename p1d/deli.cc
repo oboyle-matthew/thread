@@ -124,14 +124,14 @@ void initializeBoard() {
 }
 
 void cashier_method(void* cashier_input) {
-	int sandwich;
+	char* sandwich = malloc(64);
 	cashier* cashier_copy = (cashier*) cashier_input;
 	unsigned int cid = cashier_copy->num;
-	// ifstream myfile (argv_copy[cid]);
-	fstream myfile(argv_copy[cid]);
+	ifstream myfile (argv_copy[cid]);
+	//fstream myfile(argv_copy[cid]);
   	if (myfile.is_open()) {
-  		// getline(myfile,sandwich);
-  		myfile >> sandwich;
+  		 getline(myfile,sandwich);
+  		//myfile >> sandwich;
   		thread_lock(myBoard->lock);
     	while (myfile) {
     		if (myBoard->curr_size < myBoard->max_size) {
@@ -140,7 +140,7 @@ void cashier_method(void* cashier_input) {
       			thread_unlock(COUT_LOCK);
 
       			sandwich_order* new_sandwich = (sandwich_order*) malloc(sizeof(sandwich_order));
-      			new_sandwich->sandwich_num = sandwich;
+      			new_sandwich->sandwich_num = atoi(sandwich);
       			new_sandwich->cashier = cid;
       			new_sandwich->next = myBoard->head;
       			if (myBoard->head != NULL) {
